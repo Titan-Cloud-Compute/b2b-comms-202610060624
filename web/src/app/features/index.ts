@@ -18,7 +18,7 @@ export const FEATURE_ROUTES: Routes = [];
 // <<codegen:feature-routes:start>>
 FEATURE_ROUTES.push(
   { path: 'vendor/profile', loadComponent: () => import('./vendor-profile/vendor-profile.component').then(m => m.VendorProfileComponent) },
-  { path: 'admin/customers', loadComponent: () => import('./admin-customers/admin-customers.component').then(m => m.AdminCustomersComponent) },
+  { path: 'admin/customers', loadComponent: () => import('./customer-invite/customer-invite.component').then(m => m.CustomerInviteComponent) },
   { path: 'channels', loadComponent: () => import('./shared-channel/shared-channel.component').then(m => m.SharedChannelComponent) },
   { path: 'orders', loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent) },
   { path: 'invoices', loadComponent: () => import('./invoices/invoices.component').then(m => m.InvoicesComponent) },
