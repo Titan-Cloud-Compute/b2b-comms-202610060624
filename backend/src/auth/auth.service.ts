@@ -26,8 +26,9 @@ export interface SignupArgs {
   email: string;
   password: string;
   name?: string;
-  /** 48-char hex registration token issued by an admin. Required for all
-   *  signups after the first (bootstrap) user. */
+  /** 48-char hex registration token issued by an admin. Optional — omitting it
+   *  creates a VENDOR account. When supplied, it is validated and atomically
+   *  claimed; the user still receives role VENDOR. */
   registrationToken?: string;
 }
 export interface LoginArgs {
@@ -36,11 +37,11 @@ export interface LoginArgs {
 }
 
 /**
- * Auth flows: signup (first user → ADMIN, otherwise USER), login, logout.
+ * Auth flows: signup (self-service → VENDOR), login, logout.
  *
- * Password hashing uses bcryptjs (cost 10, OWASP-acceptable baseline). The choice
- * to count *all* users (not just admins) when deciding the bootstrap admin
- * role matches the auth_model 'full_auth' contract documented in the plan.
+ * Password hashing uses bcryptjs (cost 10, OWASP-acceptable baseline).
+ * Self-service signup is open: every call to signup() produces a VENDOR
+ * account — no request via this path can ever produce an ADMIN.
  */
 @Injectable()
 export class AuthService {
@@ -156,14 +157,12 @@ export class AuthService {
       throw new BadRequestException('password must be at least 8 characters');
     }
 
-    const count = await this.prisma.runAsAdmin((tx) => tx.user.count());
-    const isBootstrap = count === 0;
-
     let grantedModelIds: string[] = [];
     // Self-service sign-up is open: a token-less signup creates a VENDOR
-    // account. A registration token, when supplied, is still redeemed.
+    // account. A registration token, when supplied, is still validated and
+    // atomically claimed; the user still receives role VENDOR.
     const hasToken = !!args.registrationToken?.trim();
-    if (!isBootstrap && hasToken) {
+    if (hasToken) {
       const rawToken = args.registrationToken!.trim().toLowerCase();
       const regToken = await this.prisma.runAsAdmin((tx) =>
         tx.registrationToken.findUnique({ where: { token: rawToken } }),
@@ -181,9 +180,9 @@ export class AuthService {
       grantedModelIds = claimed.grantedModelIds;
     }
 
-    // Self-service signup is open: token-less accounts become VENDORs; a
-    // redeemed admin-issued token still yields USER; the bootstrap user ADMIN.
-    const role: UserRole = isBootstrap ? 'ADMIN' : hasToken ? 'USER' : 'VENDOR';
+    // Every self-service signup creates a VENDOR account.
+    // No request via this path can ever produce an ADMIN.
+    const role: UserRole = 'VENDOR';
     const passwordHash = await bcrypt.hash(args.password, 10);
 
     let user: User;
@@ -200,7 +199,7 @@ export class AuthService {
       throw err;
     }
 
-    if (!isBootstrap && args.registrationToken) {
+    if (args.registrationToken) {
       const rawToken = args.registrationToken.trim().toLowerCase();
       await this.prisma.runAsAdmin((tx) =>
         tx.registrationToken.update({

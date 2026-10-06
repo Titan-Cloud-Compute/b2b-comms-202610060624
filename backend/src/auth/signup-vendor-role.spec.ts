@@ -1,6 +1,6 @@
 /**
- * Open self-service signup: a token-less signup (after the bootstrap admin)
- * creates a VENDOR account instead of being rejected for a missing token.
+ * Open self-service signup: every token-less signup creates a VENDOR account;
+ * no self-service signup can ever produce an ADMIN.
  */
 
 import { AuthService } from './auth.service';
@@ -36,13 +36,13 @@ describe('AuthService.signup — open vendor signup', () => {
     expect(token).toBe('session-token');
   });
 
-  it('still makes the very first (bootstrap) user an ADMIN', async () => {
+  it('creates a VENDOR account even when the store is empty (no bootstrap admin)', async () => {
     const { service } = makeService(0);
     const { user } = await service.signup({
       email: 'first@example.com',
       password: 'Password1!',
     } as never);
-    expect(user.role).toBe('ADMIN');
+    expect(user.role).toBe('VENDOR');
   });
 
   it('rejects a short password', async () => {
