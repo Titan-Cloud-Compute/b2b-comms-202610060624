@@ -162,9 +162,7 @@ export class AuthService {
     let grantedModelIds: string[] = [];
     if (!isBootstrap) {
       const rawToken = args.registrationToken?.trim().toLowerCase();
-      if (!rawToken) {
-        throw new BadRequestException('registration token is required');
-      }
+      if (rawToken) {
       const regToken = await this.prisma.runAsAdmin((tx) =>
         tx.registrationToken.findUnique({ where: { token: rawToken } }),
       );
@@ -179,9 +177,16 @@ export class AuthService {
         );
       }
       grantedModelIds = claimed.grantedModelIds;
+      }
     }
 
-    const role = isBootstrap ? 'ADMIN' : 'USER';
+    // Self-service signup is open: token-less accounts become VENDORs; a
+    // redeemed admin-issued token still yields USER; the bootstrap user ADMIN.
+    const role: UserRole = isBootstrap
+      ? 'ADMIN'
+      : args.registrationToken?.trim()
+        ? 'USER'
+        : 'VENDOR';
     const passwordHash = await bcrypt.hash(args.password, 10);
 
     let user: User;

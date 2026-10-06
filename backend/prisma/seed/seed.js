@@ -22,6 +22,16 @@ if (!Array.isArray(accounts)) {
   process.exit(1);
 }
 
+// Journey demo accounts (auth entry cards) — added only when absent.
+const JOURNEY_DEMO_ACCOUNTS = [
+  { email: 'admin@b2b-portal.example.com', password: 'password', role: 'ADMIN', name: 'Portal Admin' },
+  { email: 'vendor@acme.example.com', password: 'password', role: 'VENDOR', name: 'Acme Vendor' },
+  { email: 'buyer@corp.example.com', password: 'password', role: 'CUSTOMER', name: 'Corp Buyer' },
+];
+for (const demo of JOURNEY_DEMO_ACCOUNTS) {
+  if (!accounts.some((a) => a && a.email === demo.email)) accounts.push(demo);
+}
+
 // Database URL is required for PrismaClient / PrismaPg adapter.
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
