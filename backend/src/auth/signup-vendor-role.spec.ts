@@ -1,17 +1,20 @@
 /**
  * Open self-service signup: every token-less signup creates a VENDOR account;
  * no self-service signup can ever produce an ADMIN.
+ * Also asserts that a supplied unknown token is rejected with BadRequestException.
  */
 
+import { BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
-function makeService(existingUsers: number) {
+function makeService(existingUsers: number, tokenRow: object | null = null) {
   const create = jest.fn().mockImplementation(({ data }) =>
     Promise.resolve({ id: 'u-1', ...data }),
   );
+  const findUnique = jest.fn().mockResolvedValue(tokenRow);
   const tx = {
     user: { count: jest.fn().mockResolvedValue(existingUsers), create },
-    registrationToken: { findUnique: jest.fn(), updateMany: jest.fn(), update: jest.fn() },
+    registrationToken: { findUnique, updateMany: jest.fn(), update: jest.fn() },
   };
   const prisma = {
     runAsAdmin: (fn: (t: typeof tx) => unknown) => fn(tx),
@@ -19,12 +22,12 @@ function makeService(existingUsers: number) {
   const service = new AuthService(prisma, {} as never, {} as never, {} as never);
   jest.spyOn(service as any, 'issueToken').mockResolvedValue('session-token');
   jest.spyOn(service as any, 'applyModelGrant').mockResolvedValue(undefined);
-  return { service, create, tx };
+  return { service, create, tx, findUnique };
 }
 
 describe('AuthService.signup — open vendor signup', () => {
-  it('creates a VENDOR account when no registration token is supplied', async () => {
-    const { service, create, tx } = makeService(3);
+  it('creates a VENDOR account when no registration token is supplied (count=1)', async () => {
+    const { service, create, tx } = makeService(1);
     const { user, token } = await service.signup({
       email: 'New.Vendor@Example.com',
       password: 'Password1!',
@@ -45,10 +48,15 @@ describe('AuthService.signup — open vendor signup', () => {
     expect(user.role).toBe('VENDOR');
   });
 
-  it('rejects a short password', async () => {
-    const { service } = makeService(3);
+  it('rejects an unknown registration token with BadRequestException', async () => {
+    // tokenRow = null → findUnique returns null → invalid token
+    const { service } = makeService(1, null);
     await expect(
-      service.signup({ email: 'a@example.com', password: 'short' } as never),
-    ).rejects.toThrow();
+      service.signup({
+        email: 'vendor@example.com',
+        password: 'Password1!',
+        registrationToken: 'unknown-token-abc123',
+      } as never),
+    ).rejects.toThrow(BadRequestException);
   });
 });
