@@ -8,11 +8,16 @@ function makeService() {
   const rows = new Map<string, any>();
   const prisma: any = {
     notificationPreference: {
-      findUnique: jest.fn(async ({ where }: any) => rows.get(where.userId) ?? null),
-      upsert: jest.fn(async ({ where, create, update }: any) => {
-        const existing = rows.get(where.userId);
-        const row = existing ? { ...existing, ...update } : { id: 'np-1', ...create };
-        rows.set(where.userId, row);
+      findFirst: jest.fn(async ({ where }: any) => rows.get(where.userId) ?? null),
+      create: jest.fn(async ({ data }: any) => {
+        const row = { id: `np-${data.userId}`, ...data };
+        rows.set(data.userId, row);
+        return row;
+      }),
+      update: jest.fn(async ({ where, data }: any) => {
+        const key = [...rows.keys()].find((k) => rows.get(k).id === where.id)!;
+        const row = { ...rows.get(key), ...data };
+        rows.set(key, row);
         return row;
       }),
     },

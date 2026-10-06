@@ -17,7 +17,8 @@ export class NotificationPreferencesService extends FeatureService {
   }
 
   async get(userId: string): Promise<GetApiNotificationsPreferencesResponseDto> {
-    const row = await (this.db as any).notificationPreference.findUnique({ where: { userId } });
+    // findFirst (not findUnique): the live DB has no unique index on userId.
+    const row = await (this.db as any).notificationPreference.findFirst({ where: { userId } });
     if (!row) return { userId, ...DEFAULT_PREFS };
     return { userId: row.userId, orderAlerts: row.orderAlerts, messageAlerts: row.messageAlerts };
   }
@@ -27,11 +28,13 @@ export class NotificationPreferencesService extends FeatureService {
     input: PutApiNotificationsPreferencesRequestDto,
   ): Promise<PutApiNotificationsPreferencesResponseDto> {
     const data = { orderAlerts: input.orderAlerts, messageAlerts: input.messageAlerts };
-    const row = await (this.db as any).notificationPreference.upsert({
-      where: { userId },
-      create: { userId, ...data },
-      update: data,
-    });
+    // Manual find-then-write: Prisma's native upsert keyed on userId needs a DB
+    // unique constraint that the migrations never created.
+    const repo = (this.db as any).notificationPreference;
+    const existing = await repo.findFirst({ where: { userId } });
+    const row = existing
+      ? await repo.update({ where: { id: existing.id }, data })
+      : await repo.create({ data: { userId, ...data } });
     return { userId: row.userId, orderAlerts: row.orderAlerts, messageAlerts: row.messageAlerts };
   }
 }
