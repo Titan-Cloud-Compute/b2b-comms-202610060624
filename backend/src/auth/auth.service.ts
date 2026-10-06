@@ -160,9 +160,11 @@ export class AuthService {
     const isBootstrap = count === 0;
 
     let grantedModelIds: string[] = [];
-    if (!isBootstrap) {
-      const rawToken = args.registrationToken?.trim().toLowerCase();
-      if (rawToken) {
+    // Self-service sign-up is open: a token-less signup creates a VENDOR
+    // account. A registration token, when supplied, is still redeemed.
+    const hasToken = !!args.registrationToken?.trim();
+    if (!isBootstrap && hasToken) {
+      const rawToken = args.registrationToken!.trim().toLowerCase();
       const regToken = await this.prisma.runAsAdmin((tx) =>
         tx.registrationToken.findUnique({ where: { token: rawToken } }),
       );
@@ -177,16 +179,11 @@ export class AuthService {
         );
       }
       grantedModelIds = claimed.grantedModelIds;
-      }
     }
 
     // Self-service signup is open: token-less accounts become VENDORs; a
     // redeemed admin-issued token still yields USER; the bootstrap user ADMIN.
-    const role: UserRole = isBootstrap
-      ? 'ADMIN'
-      : args.registrationToken?.trim()
-        ? 'USER'
-        : 'VENDOR';
+    const role: UserRole = isBootstrap ? 'ADMIN' : hasToken ? 'USER' : 'VENDOR';
     const passwordHash = await bcrypt.hash(args.password, 10);
 
     let user: User;

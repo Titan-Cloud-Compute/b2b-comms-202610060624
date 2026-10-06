@@ -1,9 +1,16 @@
 import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { AuthService, User } from '../shared/auth.service';
 import { AuthApi } from '../shared/api/auth-api.service';
+import { ConflictError, BadRequestError } from '../shared/api/api-errors';
 
+/**
+ * Open self-service sign-up: Email + Password, one button. The backend
+ * (POST auth/signup) creates a VENDOR account and sets the session cookie;
+ * we confirm with "Account created" and continue to /vendor/profile.
+ */
 @Component({
   selector: 'app-signup',
   standalone: true,
@@ -12,27 +19,16 @@ import { AuthApi } from '../shared/api/auth-api.service';
   template: `
     <div class="signup-container">
       <div class="signup-card">
-        <div class="logo">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <rect width="48" height="48" rx="12" style="fill: var(--color-primary)"/>
-            <path d="M14 24L22 32L34 16" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
         <h1>Create Account</h1>
-        <p class="subtitle">Join the Enterprise Platform</p>
+        <p class="subtitle">Sign up as a vendor</p>
+
+        @if (created()) {
+          <div class="success-message" role="status">Account created</div>
+        }
 
         <form (ngSubmit)="onSignup()" class="signup-form">
           @if (error()) {
-            <div class="error-message">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-              </svg>
-              {{ error() }}
-            </div>
-          }
-
-          @if (created()) {
-            <div class="success-message" role="status">Account created</div>
+            <div class="error-message" role="alert">{{ error() }}</div>
           }
 
           <div class="form-group">
@@ -61,7 +57,7 @@ import { AuthApi } from '../shared/api/auth-api.service';
             />
           </div>
 
-          <button type="submit" class="btn-primary" [disabled]="isLoading()">
+          <button type="submit" class="btn-primary" [disabled]="isLoading() || created()">
             @if (isLoading()) {
               <span class="spinner"></span>
               Creating account...
@@ -71,19 +67,11 @@ import { AuthApi } from '../shared/api/auth-api.service';
           </button>
         </form>
 
-        <div class="divider">
-          <span>or</span>
-        </div>
-
         <p class="login-link">
           Already have an account?
-          <a routerLink="/login">Sign in</a>
+          <a routerLink="/login">Log in</a>
         </p>
       </div>
-
-      <footer class="signup-footer">
-        <p>Enterprise Template</p>
-      </footer>
     </div>
   `
 })
@@ -94,7 +82,9 @@ export class SignupComponent {
   created = signal(false);
   isLoading = signal(false);
 
+  auth = inject(AuthService);
   private authApi = inject(AuthApi);
+  private router = inject(Router);
 
   async onSignup() {
     this.error.set(null);
@@ -117,12 +107,24 @@ export class SignupComponent {
     this.isLoading.set(true);
     try {
       // Open self-service signup — the backend assigns the VENDOR role.
-      await this.authApi.signup({ email, password: this.password });
+      const result = await this.authApi.signup({ email, password: this.password });
+      const role = (result?.role as User['role']) || 'VENDOR';
+      this.auth.setUser({
+        id: result?.id ?? email,
+        email: result?.email ?? email,
+        name: (result?.email ?? email).split('@')[0],
+        role,
+      });
       this.created.set(true);
-    } catch (err: any) {
-      this.error.set(
-        err?.status === 409 ? 'Email already registered' : 'Signup failed. Please try again.',
-      );
+      setTimeout(() => void this.router.navigate(['/vendor/profile']), 1500);
+    } catch (err) {
+      if (err instanceof ConflictError || (err as any)?.status === 409) {
+        this.error.set('An account with this email already exists');
+      } else if (err instanceof BadRequestError) {
+        this.error.set('Invalid sign-up data');
+      } else {
+        this.error.set('Signup failed. Please try again.');
+      }
     } finally {
       this.isLoading.set(false);
     }

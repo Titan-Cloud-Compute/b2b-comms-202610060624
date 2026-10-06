@@ -8,11 +8,11 @@ export interface User {
   email: string;
   name: string;
   firmName?: string;
-  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN' | 'VENDOR' | 'CUSTOMER' | 'MANAGER';
   firmId?: string;
 }
 
-const ROLES: readonly User['role'][] = ['USER', 'ADMIN', 'SUPER_ADMIN'];
+const ROLES: readonly User['role'][] = ['USER', 'ADMIN', 'SUPER_ADMIN', 'VENDOR', 'CUSTOMER', 'MANAGER'];
 
 /**
  * Parse a persisted user, returning null for anything that is not a valid
@@ -245,6 +245,21 @@ export class AuthService {
 
   isSuperAdmin(): boolean {
     return this._user()?.role === 'SUPER_ADMIN' || this._user()?.role === 'ADMIN';
+  }
+
+  /** Role-specific home screen used for post-login / post-signup redirects. */
+  homeRoute(): string {
+    switch (this._user()?.role) {
+      case 'ADMIN':
+      case 'SUPER_ADMIN':
+        return '/admin/customers';
+      case 'VENDOR':
+        return '/vendor/profile';
+      case 'CUSTOMER':
+        return '/orders';
+      default:
+        return '/dashboard';
+    }
   }
 
   isAuthenticated(): boolean {

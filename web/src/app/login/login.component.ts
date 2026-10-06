@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { trigger, transition, style, animate } from '@angular/animations';
-import { AuthService } from '../shared/auth.service';
+import { AuthService, User } from '../shared/auth.service';
 import { StickyFooterComponent } from '../shared/sticky-footer.component';
 import { AuthApi } from '../shared/api/auth-api.service';
 import {
@@ -64,7 +64,6 @@ import { PREVIEW_MODE } from '../shared/preview/preview-mode';
 
             <div class="form-group">
               <label for="password">{{ 'Password' }}</label>
-              <div class="password-row">
                 <input
                   type="password"
                   id="password"
@@ -74,7 +73,6 @@ import { PREVIEW_MODE } from '../shared/preview/preview-mode';
                   required
                   autocomplete="current-password"
                 />
-              </div>
               <a routerLink="/forgot-password" class="forgot-link">{{ 'Forgot password?' }}</a>
               @if (passwordError()) {
                 <small class="field-error">{{ passwordError() }}</small>
@@ -112,7 +110,6 @@ export class LoginComponent {
   emailError = signal<string | null>(null);
   passwordError = signal<string | null>(null);
   isLoading = signal(false);
-  showPassword = signal(false);
 
   /** True only in the static design-review build (see preview-mode.ts). */
   previewMode = PREVIEW_MODE;
@@ -189,7 +186,7 @@ export class LoginComponent {
         if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')) {
           this.router.navigateByUrl(returnUrl);
         } else {
-          this.router.navigate(['/dashboard']);
+          this.router.navigate([this.auth.homeRoute()]);
         }
       }
     } catch (err) {
@@ -217,32 +214,28 @@ export class LoginComponent {
    * shells stay reviewable from the one form.
    */
   private previewSignIn() {
-    const isAdmin = /admin/i.test(this.email);
     const name = this.email.split('@')[0];
-    this.auth.setUser(
-      isAdmin
-        ? { id: 'preview-admin', email: this.email, name, role: 'ADMIN' }
-        : {
-            id: 'preview-user',
-            email: this.email,
-            name,
-            role: 'USER',
-          },
-    );
-    this.router.navigate([isAdmin ? '/admin/customers' : '/dashboard']);
+    const role: User['role'] = /admin/i.test(this.email)
+      ? 'ADMIN'
+      : /vendor|acme/i.test(this.email)
+        ? 'VENDOR'
+        : /buyer|customer/i.test(this.email)
+          ? 'CUSTOMER'
+          : 'USER';
+    this.auth.setUser({ id: 'preview-' + role.toLowerCase(), email: this.email, name, role });
+    this.router.navigate([this.auth.homeRoute()]);
   }
 
-  private mapRole(
-    backendRole: string,
-  ): 'USER' | 'ADMIN' | 'SUPER_ADMIN' {
+  private mapRole(backendRole: string): User['role'] {
     switch (backendRole) {
       case 'ADMIN':
-        return 'ADMIN';
       case 'SUPER_ADMIN':
-        return 'SUPER_ADMIN';
+      case 'VENDOR':
+      case 'CUSTOMER':
+      case 'MANAGER':
+        return backendRole;
       default:
         return 'USER';
     }
   }
-
 }
