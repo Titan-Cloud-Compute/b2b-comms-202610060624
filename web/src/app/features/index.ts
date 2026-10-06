@@ -19,7 +19,7 @@ export const FEATURE_ROUTES: Routes = [];
 FEATURE_ROUTES.push(
   { path: 'vendor/profile', loadComponent: () => import('./vendor-profile/vendor-profile.component').then(m => m.VendorProfileComponent) },
   { path: 'admin/customers', loadComponent: () => import('./admin-customers/admin-customers.component').then(m => m.AdminCustomersComponent) },
-  { path: 'channels', loadComponent: () => import('./channels/channels.component').then(m => m.ChannelsComponent) },
+  { path: 'channels', loadComponent: () => import('./shared-channel/shared-channel.component').then(m => m.SharedChannelComponent) },
   { path: 'orders', loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent) },
   { path: 'invoices', loadComponent: () => import('./invoices/invoices.component').then(m => m.InvoicesComponent) },
   { path: 'settings/notifications', loadComponent: () => import('./settings-notifications/settings-notifications.component').then(m => m.SettingsNotificationsComponent) },
